@@ -1,0 +1,199 @@
+# 🔁 Traefik ServersTransport – Beginner to Production Guide
+
+This guide explains **Traefik ServersTransport** in a simple, practical way so learners understand **how Traefik talks to backend services securely**.
+
+---
+
+## 🌱 What is ServersTransport?
+
+**ServersTransport defines HOW Traefik connects to backend services (Services/Pods).**
+
+Think of it as:
+
+> 🤝 **Trust and connection rules between Traefik and your application**
+
+ServersTransport controls:
+- Backend TLS verification
+- Custom Certificate Authorities (CA)
+- Backend mTLS (Traefik → Service)
+- Timeouts and connection behavior
+
+ServersTransport does **NOT**:
+- Route traffic
+- Handle client TLS (browser → Traefik)
+- Choose frontend certificates
+
+---
+
+## 🧠 Where ServersTransport Fits (Mental Model)
+
+```
+Client
+  ↓
+EntryPoint (web / websecure)
+  ↓
+IngressRoute
+  ↓
+TLS (client-side)
+   ├─ TLSStore
+   ├─ TLSOption
+  ↓
+ServersTransport (backend-side)
+  ↓
+Service
+  ↓
+Pod
+```
+
+---
+
+## ⭐ Golden Rules (VERY IMPORTANT)
+
+1️⃣ ServersTransport affects **Traefik → backend**, not clients  
+2️⃣ It is attached **per service** inside `IngressRoute`  
+3️⃣ Optional — use it **only when backend uses TLS**  
+
+---
+
+## 🔓 Default Behavior (No ServersTransport)
+
+### When to use
+- Backend is plain HTTP
+- Internal trusted networks
+
+```yaml
+services:
+  - name: myapp
+    port: 80
+```
+
+✔ Simple  
+✔ No TLS verification
+
+---
+
+## 🔐 Backend HTTPS (Custom CA)
+
+### When to use
+- Backend uses HTTPS
+- Internal CA or self-signed cert
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: backend-ca
+spec:
+  rootCAsSecrets:
+    - backend-ca
+```
+
+Attach to IngressRoute:
+```yaml
+services:
+  - name: myapp
+    port: 443
+    scheme: https
+    serversTransport: backend-ca
+```
+
+📌 `backend-ca` secret must contain `ca.crt`.
+
+---
+
+## 🔐 Backend mTLS (Traefik → Service)
+
+### When to use
+- Zero-trust internal services
+- Compliance environments
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: backend-mtls
+spec:
+  rootCAsSecrets:
+    - backend-ca
+  certificatesSecrets:
+    - traefik-client-cert
+```
+
+This enables:
+```
+Traefik ↔ Backend Service (mTLS)
+```
+
+---
+
+## ⚠️ Skip TLS Verification (NOT Recommended)
+
+### When (rare)
+- Temporary debugging only
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: insecure-backend
+spec:
+  insecureSkipVerify: true
+```
+
+❌ Do NOT use in production.
+
+---
+
+## 🔗 How to Use ServersTransport in IngressRoute
+
+```yaml
+services:
+  - name: myapp
+    port: 443
+    scheme: https
+    serversTransport: backend-mtls
+```
+
+📌 ServersTransport must exist in **same namespace**.
+
+---
+
+## 🔍 ServersTransport vs TLSOption (Common Confusion)
+
+| Feature | ServersTransport | TLSOption |
+|-------|------------------|-----------|
+| Client-side TLS | ❌ | ✅ |
+| Backend TLS | ✅ | ❌ |
+| mTLS support | ✅ (Traefik → backend) | ✅ (Client → Traefik) |
+| Controls certs | ❌ | ❌ |
+
+---
+
+## 🚨 Common Mistakes
+
+❌ Using ServersTransport for frontend TLS  
+❌ Forgetting `scheme: https`  
+❌ Missing CA or client cert secret  
+❌ Using insecureSkipVerify in prod  
+❌ Wrong namespace  
+
+---
+
+## 🧠 Mental Shortcut (Remember This)
+
+> 🔐 **TLSOption = client → Traefik**  
+> 🔁 **ServersTransport = Traefik → backend**
+
+---
+
+## ✅ Summary
+
+- ServersTransport secures backend connections
+- Required for backend TLS/mTLS
+- Attached per service
+- Optional but powerful
+
+---
+
+Happy learning 🔁🔐  
+This guide is suitable for **onboarding, production, and interviews**.
