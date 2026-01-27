@@ -1,0 +1,173 @@
+# 🗂️ Traefik TLSStore – Beginner to Production Guide
+
+This guide explains **Traefik TLSStore** in a clear, beginner-friendly way so learners understand **where certificates come from** and **how Traefik chooses them**.
+
+---
+
+## 🌱 What is TLSStore?
+
+**TLSStore defines WHERE Traefik gets TLS certificates from.**
+
+Think of it as:
+
+> 🗄️ **The certificate vault for Traefik**
+
+TLSStore controls:
+- Default TLS certificate
+- Fallback certificate behavior
+
+TLSStore does **NOT**:
+- Control TLS versions
+- Enforce mTLS
+- Handle routing
+
+---
+
+## 🧠 Where TLSStore Fits (Mental Model)
+
+```
+Client
+  ↓
+EntryPoint (websecure)
+  ↓
+IngressRoute
+  ↓
+TLS
+   ├─ TLSStore   → which certificate?
+   ├─ TLSOption  → how strict TLS is?
+  ↓
+Service → Pod
+```
+
+---
+
+## ⭐ Golden Rules (VERY IMPORTANT)
+
+1️⃣ **Only ONE TLSStore can be named `default` per namespace**  
+2️⃣ TLSStore is used **only when IngressRoute does NOT specify `secretName`**  
+3️⃣ TLSStore does **not apply TLS rules** (that’s TLSOption)
+
+---
+
+## 🧾 Basic TLSStore (Most Common)
+
+### When to use
+- Internal platforms
+- Single certificate
+- Corporate PKI
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: TLSStore
+metadata:
+  name: default
+spec:
+  defaultCertificate:
+    secretName: myapp-tls
+```
+
+📌 `myapp-tls` must be a Kubernetes TLS secret.
+
+---
+
+## 🌐 Wildcard Certificate (Enterprise Pattern)
+
+### When to use
+- Multiple subdomains
+- Internal platforms
+- Reduced cert management
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: TLSStore
+metadata:
+  name: default
+spec:
+  defaultCertificate:
+    secretName: wildcard-apsis-localnet
+```
+
+Covers:
+```
+*.apsis.localnet
+```
+
+---
+
+## 🔁 TLSStore vs IngressRoute `secretName`
+
+### Option A: Explicit Certificate (Override)
+```yaml
+tls:
+  secretName: myapp-specific-tls
+```
+
+✔ Highest priority  
+✔ App-specific cert
+
+---
+
+### Option B: TLSStore Default (Fallback)
+```yaml
+tls: {}
+```
+
+✔ Uses TLSStore default cert  
+✔ Clean config
+
+---
+
+## 🔍 TLSStore vs TLSOption (Very Common Confusion)
+
+| Feature                | TLSStore | TLSOption |
+|------------------------|----------|-----------|
+| Provides certificates  | ✅       | ❌        |
+| Controls TLS rules     | ❌       | ✅        |
+| Used for mTLS          | ❌       | ✅        |
+| Default behavior       | ✅       | ❌        |
+
+---
+
+## 🚨 Common Mistakes
+
+❌ Naming TLSStore anything other than `default`  
+❌ Expecting TLSStore to control TLS versions  
+❌ Secret not in same namespace  
+❌ Missing TLS secret  
+❌ Assuming TLSStore applies automatically without HTTPS entryPoint
+
+---
+
+## 🧪 Real-World Example (Clean HTTPS)
+
+```yaml
+tls:
+  options:
+    name: strict-tls
+```
+
+What happens:
+- Cert → from TLSStore
+- TLS rules → from TLSOption
+- Routing → from IngressRoute
+
+---
+
+## 🧠 Mental Shortcut (Remember This)
+
+> 🔐 **TLSStore = WHICH certificate**  
+> 🛡️ **TLSOption = HOW TLS works**
+
+---
+
+## ✅ Summary
+
+- TLSStore holds default certificates
+- Used only when no cert is specified
+- One default TLSStore per namespace
+- Perfect for wildcard & corporate certs
+
+---
+
+Happy learning 🧠🔐  
+This guide is suitable for **onboarding, production, and interviews**.
