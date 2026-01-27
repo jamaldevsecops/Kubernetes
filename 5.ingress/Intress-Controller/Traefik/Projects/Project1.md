@@ -218,4 +218,4 @@ This project demonstrates a **clean, production-style Traefik deployment** using
 ---
 
 Happy deploying 🚀  
-This project is suitable for **learning, demos, and onboarding**.
+
