@@ -35,6 +35,7 @@ helm install ingress-nginx ingress-nginx/ingress-nginx \
   --set controller.nodeSelector."kubernetes\.io/os"=linux \
   --set defaultBackend.nodeSelector."kubernetes\.io/os"=linux \
   --set controller.service.externalTrafficPolicy=Local
+  --set controller.service.loadBalancerIP=192.168.20.11
 ```
   - replicaCount=2: Ensures high availability with two replicas.
   - nodeSelector: Restricts to Linux nodes.
