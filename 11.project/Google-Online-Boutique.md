@@ -21,6 +21,8 @@ The application is a **microservices-based e-commerce demo** consisting of:
 * Redis (cart storage)
 
 ---
+## 🔗 References
+- GitHub Repo: https://github.com/GoogleCloudPlatform/microservices-demo  
 
 ## 🧱 Architecture Overview
 
