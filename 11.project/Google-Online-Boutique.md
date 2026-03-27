@@ -136,49 +136,7 @@ http://192.168.20.161
 
 ---
 
-# 🔹 Option 2: Access via NodePort
-
-Use NodePort (from the same service):
-
-```
-80:32541/TCP
-```
-
-### ✅ Access:
-
-```
-http://<NODE-IP>:32541
-```
-
-Example:
-
-```
-http://192.168.20.10:32541
-```
-
----
-
-# 🔹 Option 3: Port Forward (Always Works)
-
-```bash
-kubectl port-forward -n boutique svc/frontend 8080:80
-```
-
-### ✅ Access:
-
-```
-http://127.0.0.1:8080
-```
-
-✔ Recommended for:
-
-* Testing
-* NetworkPolicy validation
-* Local debugging
-
----
-
-# 🔹 Option 4: Access via Traefik IngressRoute (Recommended)
+# 🔹 Option 2: Access via Traefik IngressRoute (Recommended)
 
 ## 🧠 Why use Ingress?
 
