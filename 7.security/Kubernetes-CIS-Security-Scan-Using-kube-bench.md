@@ -2,6 +2,159 @@
 
 ---
 
+## 🎯 Coverage Scope (Very Important)
+
+kube-bench validates your Kubernetes cluster against the **CIS Kubernetes Benchmark**.
+
+### ✅ What kube-bench actually checks
+
+It audits **node-level configurations**, not workloads.
+
+#### 🔐 Control Plane (Master Node)
+
+* kube-apiserver flags & security settings
+* kube-controller-manager configuration
+* kube-scheduler configuration
+* etcd security (encryption, certs, access)
+* Control-plane file permissions
+
+#### 🖥️ Worker Node
+
+* kubelet configuration (auth, TLS, cert rotation)
+* kube-proxy configuration
+* Node file permissions
+
+#### 📂 Filesystem-level checks
+
+* Static pod manifests (/etc/kubernetes/manifests)
+* Systemd service configs
+* PKI certificates
+* Config files & permissions
+
+---
+
+### ❗ What kube-bench does NOT cover
+
+* ❌ NetworkPolicies enforcement
+* ❌ Runtime threats (use Falco)
+* ❌ Container image vulnerabilities (use Trivy)
+* ❌ RBAC misuse at runtime
+* ❌ Application-level security
+
+👉 So kube-bench = **CIS compliance scanner (configuration audit tool)**
+
+---
+
+## 🧠 Understanding cfg Directory (Your Output Explained)
+
+Your structure:
+
+```
+cfg/
+ ├── cis-1.12
+ ├── cis-1.23
+ ├── cis-1.24
+ ├── eks-*
+ ├── gke-*
+ ├── aks-*
+ ├── k3s-*
+ └── rke-*
+```
+
+### 🔎 What this means
+
+kube-bench supports **multiple Kubernetes distributions & versions**:
+
+| Directory | Meaning                            |
+| --------- | ---------------------------------- |
+| cis-1.12  | CIS benchmark for Kubernetes v1.12 |
+| cis-1.23  | CIS benchmark for Kubernetes v1.23 |
+| cis-1.24  | CIS benchmark for Kubernetes v1.24 |
+| eks-*     | AWS EKS specific benchmarks        |
+| gke-*     | Google GKE benchmarks              |
+| aks-*     | Azure AKS benchmarks               |
+| k3s-*     | Lightweight Kubernetes (k3s)       |
+| rke/rke2  | Rancher distributions              |
+
+---
+
+### 📌 Important for YOU (kubeadm cluster)
+
+👉 You should use:
+
+```
+cis-<your-k8s-version>
+```
+
+Example:
+
+| Kubernetes Version | Use cfg                            |
+| ------------------ | ---------------------------------- |
+| v1.23              | cis-1.23                           |
+| v1.24              | cis-1.24                           |
+| v1.35              | closest available (e.g., cis-1.24) |
+
+---
+
+### 📂 Inside a CIS directory (Your Example: cis-1.12)
+
+```
+cis-1.12/
+ ├── config.yaml
+ ├── controlplane.yaml
+ ├── etcd.yaml
+ ├── master.yaml
+ ├── node.yaml
+ └── policies.yaml
+```
+
+### 🔍 Purpose of each file
+
+| File              | Role                                     |
+| ----------------- | ---------------------------------------- |
+| controlplane.yaml | API server, scheduler, controller checks |
+| etcd.yaml         | etcd security checks                     |
+| master.yaml       | Master node checks (legacy naming)       |
+| node.yaml         | Worker node checks                       |
+| policies.yaml     | Test definitions                         |
+| config.yaml       | Entry point config                       |
+
+---
+
+### ⚙️ How kube-bench selects benchmark
+
+By default:
+
+✔ Auto-detects Kubernetes version
+✔ Maps to closest `cis-*` directory
+✔ Executes relevant checks
+
+---
+
+### 🔧 Force a specific benchmark (Recommended for labs)
+
+```bash
+sudo ./kube-bench \
+  --benchmark cis-1.24 \
+  --config-dir `pwd`/cfg
+```
+
+---
+
+### 🎯 Real-world Recommendation (Your Environment)
+
+Since you're running **kubeadm (RHEL + CRI-O)**:
+
+✔ Use `cis-*` (NOT eks/gke/aks)
+✔ Run on each node separately
+✔ Match closest Kubernetes version
+
+---
+
+## 📌 Overview
+
+---
+
 ## 📌 Overview
 
 This runbook provides a **production-grade step-by-step guide** to:
