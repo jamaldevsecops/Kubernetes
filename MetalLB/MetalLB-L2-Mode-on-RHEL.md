@@ -1,9 +1,9 @@
 # 🚀 MetalLB L2 Mode Installation Runbook
 
-**Environment:** RHEL 8 + Kubernetes v1.35.x + CRI-O + Calico
-**Version:** MetalLB v0.15.3
-**Mode:** Layer 2 (L2)
-**IP Pool:** 10.210.2.122–10.210.2.124
+**Environment:** RHEL 8 + Kubernetes v1.35.x + CRI-O + Calico  
+**Version:** MetalLB v0.15.3  
+**Mode:** Layer 2 (L2)  
+**IP Pool:** 10.210.2.122–10.210.2.124  
 
 ---
 
@@ -17,7 +17,7 @@ Deploy MetalLB in **Layer 2 mode** to provide `LoadBalancer` service support for
 
 ## ✅ Cluster Requirements
 
-* Kubernetes cluster (kubeadm-based)
+* Kubernetes cluster (kubeadm-based) 
 * All nodes in `Ready` state
 * CNI (Calico) installed and healthy
 * CRI-O runtime functional
