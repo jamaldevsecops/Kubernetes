@@ -138,7 +138,7 @@ kubectl wait -n metallb-system \
 kubectl get pods -n metallb-system
 ```
 
-✔ controller → Running
+✔ controller → Running  
 ✔ speaker → Running on all nodes
 
 ---
