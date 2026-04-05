@@ -1,79 +1,217 @@
-# 🚀 MetalLB L2 Mode Installation Runbook
+# MetalLB L2 Mode Runbook (Updated for EndpointSlice Warning)
 
-**Environment:** RHEL 8 + Kubernetes v1.35.x + CRI-O + Calico  
-**Version:** MetalLB v0.15.3  
-**Mode:** Layer 2 (L2)  
-**IP Pool:** 10.210.2.122–10.210.2.124  
+**Environment**
+- OS: RHEL 8
+- Kubernetes: v1.35.x (kubeadm)
+- Runtime: CRI-O
+- CNI: Calico
+- Firewall: firewalld enabled
+- Proxy: enabled for outbound internet access
+- MetalLB: v0.15.3
+- Mode: Layer 2 (L2)
+- IP Pool: `10.210.2.122-10.210.2.124`
 
 ---
 
-# 📌 1. Objective
+## 1. Purpose
 
-Deploy MetalLB in **Layer 2 mode** to provide `LoadBalancer` service support for on-prem Kubernetes cluster.
+This runbook installs MetalLB in **L2 mode** using the official **v0.15.3** manifest and uses **EndpointSlice-aware validation commands** to avoid the deprecated `Endpoints` warning introduced in Kubernetes v1.33+. As of Kubernetes v1.33, the old `Endpoints` API is deprecated and users should move scripts and operational checks to `EndpointSlice` (`discovery.k8s.io/v1`).
 
 ---
 
-# 🧱 2. Prerequisites
+## 2. Important Note About Your Warning
 
-## ✅ Cluster Requirements
-
-* Kubernetes cluster (kubeadm-based) 
-* All nodes in `Ready` state
-* CNI (Calico) installed and healthy
-* CRI-O runtime functional
-
-## ✅ Network Requirements
-
-* Nodes in subnet: `10.210.2.0/24`
-* Reserved IP range:
-
-  * `10.210.2.122–124` (must NOT be used elsewhere)
-* Same L2 network (no routing between nodes and clients)
-
-## ⚠️ Important Checks
+When you ran:
 
 ```bash
-ping 10.210.2.122
-arp -an | grep 10.210.2.122
+kubectl get svc,endpoints -n metallb-system
 ```
 
-✔ Ensure IPs are:
+you received:
 
-* Not assigned
-* Not in DHCP pool
-* Not used by F5 / gateway / servers
+```text
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+```
+
+This is **not a failure**. It is only a **deprecation warning** because `kubectl` is reading the legacy `Endpoints` resource. The correct production approach is:
+
+- keep using `Service` objects as usual,
+- stop using `kubectl get endpoints ...` in checks and scripts,
+- use `EndpointSlice` instead.
 
 ---
 
-# 📦 3. Install MetalLB (Official Manifest)
+## 3. Production-Safe Replacement Commands
 
-## ▶️ Apply official manifest
+### Old command (deprecated)
+
+```bash
+kubectl get svc,endpoints -n metallb-system
+```
+
+### New commands (recommended)
+
+```bash
+kubectl get svc -n metallb-system
+kubectl get endpointslices.discovery.k8s.io -n metallb-system
+```
+
+### Best focused check for MetalLB webhook backend
+
+```bash
+kubectl get svc metallb-webhook-service -n metallb-system
+kubectl get endpointslices.discovery.k8s.io -n metallb-system \
+  -l kubernetes.io/service-name=metallb-webhook-service
+```
+
+### Detailed YAML view
+
+```bash
+kubectl get endpointslices.discovery.k8s.io -n metallb-system \
+  -l kubernetes.io/service-name=metallb-webhook-service -o yaml
+```
+
+---
+
+## 4. Pre-Checks
+
+### 4.1 Cluster health
+
+```bash
+kubectl get nodes -o wide
+kubectl get pods -A -o wide
+```
+
+Expected:
+- all nodes `Ready`
+- no critical pods in `CrashLoopBackOff`
+
+### 4.2 Check firewall state on each node
+
+```bash
+firewall-cmd --state
+firewall-cmd --get-active-zones
+firewall-cmd --list-all
+```
+
+### 4.3 Check proxy-related NO_PROXY coverage
+
+Ensure the following are excluded from proxying in node/container runtime configuration:
+
+```text
+localhost,127.0.0.1,10.0.0.0/8,10.96.0.0/12,10.244.0.0/16,.svc,.cluster.local
+```
+
+This is important because cluster-internal traffic such as API server to webhook service must stay internal.
+
+### 4.4 Confirm IP pool is free
+
+```bash
+ping -c 2 10.210.2.122
+ping -c 2 10.210.2.123
+ping -c 2 10.210.2.124
+arp -an | egrep '10.210.2.122|10.210.2.123|10.210.2.124'
+```
+
+Expected:
+- no active host response
+- no conflicting ARP entry from another device
+
+---
+
+## 5. Firewall Guidance
+
+If `firewalld` is enabled, make sure Kubernetes and Calico traffic is not blocked.
+
+### Minimum common Kubernetes ports
+
+Run as needed based on your node role and policy:
+
+```bash
+firewall-cmd --permanent --add-port=6443/tcp
+firewall-cmd --permanent --add-port=10250/tcp
+firewall-cmd --permanent --add-port=10256/tcp
+firewall-cmd --permanent --add-port=30000-32767/tcp
+firewall-cmd --permanent --add-port=30000-32767/udp
+```
+
+### Calico-related allowances often needed
+
+```bash
+firewall-cmd --permanent --add-port=179/tcp
+firewall-cmd --permanent --add-protocol=ipip
+```
+
+### Allow pod and service CIDRs internally
+
+```bash
+firewall-cmd --permanent \
+  --add-rich-rule='rule family="ipv4" source address="10.244.0.0/16" accept'
+firewall-cmd --permanent \
+  --add-rich-rule='rule family="ipv4" source address="10.96.0.0/12" accept'
+firewall-cmd --reload
+```
+
+> Adjust these if your actual Service CIDR differs from `10.96.0.0/12`.
+
+---
+
+## 6. Install MetalLB v0.15.3
+
+Apply the official manifest:
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.15.3/config/manifests/metallb-native.yaml
 ```
 
----
-
-## ▶️ Verify installation
+Wait for readiness:
 
 ```bash
-kubectl get pods -n metallb-system
+kubectl wait -n metallb-system --for=condition=Available deployment/controller --timeout=180s
+kubectl get pods -n metallb-system -o wide
 ```
 
-### ✅ Expected Output
-
-* controller pod (1)
-* speaker pods (one per node)
+Expected:
+- `controller` deployment available
+- `speaker` daemonset pods running on nodes
 
 ---
 
-# 🔐 4. Create IP Pool & L2 Advertisement
+## 7. Validate Webhook Using EndpointSlice-Aware Checks
 
-## ▶️ Create configuration file
+### Check service
 
 ```bash
-cat > metallb-l2-config.yaml <<EOF
+kubectl get svc metallb-webhook-service -n metallb-system
+```
+
+### Check EndpointSlice instead of Endpoints
+
+```bash
+kubectl get endpointslices.discovery.k8s.io -n metallb-system \
+  -l kubernetes.io/service-name=metallb-webhook-service
+```
+
+### Example interpretation
+
+If you see one or more EndpointSlice objects with backend addresses and port `9443`, the webhook backend exists and the service has usable endpoints.
+
+### Optional detailed description
+
+```bash
+kubectl describe svc metallb-webhook-service -n metallb-system
+kubectl get endpointslices.discovery.k8s.io -n metallb-system \
+  -l kubernetes.io/service-name=metallb-webhook-service -o yaml
+```
+
+---
+
+## 8. Create MetalLB L2 Configuration
+
+Create the configuration file:
+
+```bash
+cat > metallb-l2-config.yaml <<'EOFCONF'
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
@@ -82,7 +220,6 @@ metadata:
 spec:
   addresses:
   - 10.210.2.122-10.210.2.124
-
 ---
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
@@ -92,20 +229,16 @@ metadata:
 spec:
   ipAddressPools:
   - production-pool
-EOF
+EOFCONF
 ```
 
----
-
-## ▶️ Apply configuration
+Apply it:
 
 ```bash
 kubectl apply -f metallb-l2-config.yaml
 ```
 
----
-
-## ▶️ Verify resources
+Verify:
 
 ```bash
 kubectl get ipaddresspools -n metallb-system
@@ -114,126 +247,105 @@ kubectl get l2advertisements -n metallb-system
 
 ---
 
-# 🧪 5. Functional Test (LoadBalancer)
+## 9. Functional Test
 
-## ▶️ Deploy test application
+Deploy a test service:
 
 ```bash
 kubectl create deployment nginx-test --image=nginx
-kubectl expose deployment nginx-test \
-  --port=80 \
-  --target-port=80 \
-  --type=LoadBalancer
+kubectl expose deployment nginx-test --port=80 --target-port=80 --type=LoadBalancer
+kubectl get svc nginx-test -o wide
 ```
 
----
+Expected:
+- external IP assigned from:
+  - `10.210.2.122`
+  - `10.210.2.123`
+  - `10.210.2.124`
 
-## ▶️ Verify service
+Validate from another host on the same network:
 
 ```bash
-kubectl get svc -o wide
-```
-
-### ✅ Expected Output
-
-```
-EXTERNAL-IP: 10.210.2.122 (or .123 / .124)
-```
-
----
-
-# 🌐 6. Connectivity Validation
-
-## ▶️ From same network machine
-
-```bash
-ping 10.210.2.122
 curl http://10.210.2.122
 arp -an | grep 10.210.2.122
 ```
 
 ---
 
-## 🧠 Expected Behavior
+## 10. Webhook Troubleshooting
 
-* One node (speaker) will **announce IP via ARP**
-* Traffic will flow:
+If applying `metallb-l2-config.yaml` fails with webhook timeout:
 
-```
-Client → VIP → Node → Pod
-```
-
----
-
-# 🔍 7. Troubleshooting Guide
-
-## ❌ EXTERNAL-IP Pending
-
-### Check:
+### 10.1 Check MetalLB pods
 
 ```bash
-kubectl describe svc nginx-test
-kubectl get events -A | grep metallb
+kubectl get pods -n metallb-system -o wide
 ```
 
----
-
-## ❌ Speaker Issues
+### 10.2 Check controller logs
 
 ```bash
-kubectl logs -n metallb-system -l component=speaker
+kubectl logs -n metallb-system deploy/controller --tail=200
 ```
 
----
-
-## ❌ Controller Issues
+### 10.3 Check service and EndpointSlice
 
 ```bash
-kubectl logs -n metallb-system deploy/controller
+kubectl get svc metallb-webhook-service -n metallb-system
+kubectl get endpointslices.discovery.k8s.io -n metallb-system \
+  -l kubernetes.io/service-name=metallb-webhook-service
+```
+
+### 10.4 Check kube-proxy and Calico
+
+```bash
+kubectl logs -n kube-system -l k8s-app=kube-proxy --tail=100
+kubectl logs -n kube-system -l k8s-app=calico-node --tail=100
+```
+
+### 10.5 Check firewall again
+
+```bash
+firewall-cmd --list-all
+```
+
+Most likely causes:
+- MetalLB controller not ready
+- webhook backend not published into EndpointSlice
+- firewall blocking service/pod traffic
+- NO_PROXY missing cluster-internal ranges/domains
+
+---
+
+## 11. Updated Operational Commands
+
+Use these in your day-to-day checks to avoid the deprecation warning.
+
+### MetalLB namespace health
+
+```bash
+kubectl get pods -n metallb-system -o wide
+kubectl get svc -n metallb-system
+kubectl get endpointslices.discovery.k8s.io -n metallb-system
+```
+
+### Webhook backend health
+
+```bash
+kubectl get svc metallb-webhook-service -n metallb-system
+kubectl get endpointslices.discovery.k8s.io -n metallb-system \
+  -l kubernetes.io/service-name=metallb-webhook-service
+```
+
+### Service exposure check
+
+```bash
+kubectl get svc -A
 ```
 
 ---
 
-## ❌ Network Issues
-
-Verify:
-
-* Same subnet
-* No firewall blocking ARP
-* No IP conflict
-
----
-
-# 🔐 8. Production Hardening Checklist
-
-## ✅ Network
-
-* Reserve IP range in network team documentation
-* Exclude from DHCP scope
-
-## ✅ Security
-
-* Restrict access via NetworkPolicy (Calico)
-* Limit LoadBalancer exposure (internal vs external)
-
-## ✅ Observability
-
-* Monitor:
-
-  * speaker pod restarts
-  * ARP announcements
-  * service availability
-
-## ✅ High Availability
-
-* Ensure:
-
-  * multiple worker nodes
-  * speaker runs on all nodes
-
----
-
-# 🧹 9. Cleanup (Test Resources)
+## 12. Cleanup Test Resources
 
 ```bash
 kubectl delete svc nginx-test
@@ -242,49 +354,9 @@ kubectl delete deployment nginx-test
 
 ---
 
-# 📊 10. Architecture Overview
+## 13. Final Notes
 
-```
-                +----------------------+
-                |     Client Network   |
-                |   10.210.2.0/24      |
-                +----------+-----------+
-                           |
-                     (ARP Request)
-                           |
-                    +------v------+
-                    | MetalLB VIP |
-                    |10.210.2.122 |
-                    +------+------+
-                           |
-                +----------v----------+
-                |  Kubernetes Node    |
-                | (Speaker Active)    |
-                +----------+----------+
-                           |
-                    +------v------+
-                    |   Service   |
-                    +------v------+
-                    |     Pod     |
-                    +-------------+
-```
+- The warning you saw is expected on Kubernetes v1.33+ when reading `Endpoints`.
+- Your output already showed the webhook backend exists; in modern checks, confirm this through `EndpointSlice` instead of `Endpoints`.
+- For production scripts, monitoring, and runbooks, replace all `kubectl get endpoints ...` usage with `kubectl get endpointslices.discovery.k8s.io ...`.
 
----
-
-# 🧠 11. Key Notes (Enterprise Insight)
-
-* L2 mode = simple, no router config
-* Not ideal for large-scale (use BGP for scaling)
-* Single node handles traffic per service (no ECMP)
-* Failover is fast but not instant (~seconds)
-
----
-
-# 🏁 Final Status
-
-✔ MetalLB Installed
-✔ IP Pool Configured
-✔ LoadBalancer Working
-✔ Cluster Ready for Ingress / Production Traffic
-
----
