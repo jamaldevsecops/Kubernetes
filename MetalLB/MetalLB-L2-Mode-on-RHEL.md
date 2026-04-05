@@ -108,7 +108,7 @@ firewall-cmd --permanent --add-masquerade
 firewall-cmd --reload
 ```
 
-## 🛡️ Allow required Kubernetes & networking traffic on Master Node
+## 🛡️ Allow required Kubernetes & networking traffic on Worker Nodes
 
 ```bash
 # 🤖 kubelet API (master → worker communication)
