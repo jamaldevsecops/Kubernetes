@@ -65,29 +65,83 @@ firewall-cmd --list-all
 
 ---
 
-## 🛡️ Allow required Kubernetes & networking traffic
+## 🛡️ Allow required Kubernetes & networking traffic on Master Node
 
 ```bash
-# Kubernetes control plane
+# 🔐 Kubernetes API Server (worker → master communication)
 firewall-cmd --permanent --add-port=6443/tcp
+
+# 🧠 etcd cluster communication (control-plane internal)
+firewall-cmd --permanent --add-port=2379-2380/tcp
+
+# 🤖 kubelet API (metrics, exec, logs)
 firewall-cmd --permanent --add-port=10250/tcp
+
+# 🎛️ Controller Manager
+firewall-cmd --permanent --add-port=10257/tcp
+
+# 🗂️ Scheduler
+firewall-cmd --permanent --add-port=10259/tcp
+
+# 🔁 kube-proxy (service routing health checks)
 firewall-cmd --permanent --add-port=10256/tcp
 
-# NodePort range
-firewall-cmd --permanent --add-port=30000-32767/tcp
-firewall-cmd --permanent --add-port=30000-32767/udp
-
-# Calico networking
-firewall-cmd --permanent --add-protocol=ipip
+# 🌐 Calico BGP (only if BGP mode is used; safe to keep open)
 firewall-cmd --permanent --add-port=179/tcp
 
-# Pod & Service CIDR access
+# 🌉 Calico VXLAN overlay (CRITICAL for pod networking)
+firewall-cmd --permanent --add-port=4789/udp
+
+# 📦 Calico IP-in-IP (if enabled)
+firewall-cmd --permanent --add-protocol=ipip
+
+# 🧩 Allow POD network (cluster internal traffic)
 firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address=10.244.0.0/16 accept'
+
+# 🧩 Allow SERVICE network (ClusterIP range)
 firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address=10.96.0.0/12 accept'
 
+# 🔄 Enable NAT / forwarding (required for pod routing & service access)
+firewall-cmd --permanent --add-masquerade
+
+# 🔁 Apply changes
 firewall-cmd --reload
 ```
 
+## 🛡️ Allow required Kubernetes & networking traffic on Master Node
+
+```bash
+# 🤖 kubelet API (master → worker communication)
+firewall-cmd --permanent --add-port=10250/tcp
+
+# 🔁 kube-proxy (service routing)
+firewall-cmd --permanent --add-port=10256/tcp
+
+# 🌐 Calico BGP (only required if BGP mode is used)
+firewall-cmd --permanent --add-port=179/tcp
+
+# 🌉 Calico VXLAN overlay (CRITICAL for pod networking)
+firewall-cmd --permanent --add-port=4789/udp
+
+# 📦 Calico IP-in-IP (if enabled)
+firewall-cmd --permanent --add-protocol=ipip
+
+# 🌍 NodePort services (external access to services)
+firewall-cmd --permanent --add-port=30000-32767/tcp
+firewall-cmd --permanent --add-port=30000-32767/udp
+
+# 🧩 Allow POD network (cluster internal traffic)
+firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address=10.244.0.0/16 accept'
+
+# 🧩 Allow SERVICE network (ClusterIP range)
+firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address=10.96.0.0/12 accept'
+
+# 🔄 Enable NAT / forwarding (required for pod routing & service access)
+firewall-cmd --permanent --add-masquerade
+
+# 🔁 Apply changes
+firewall-cmd --reload
+```
 ---
 
 # 🌐 4. Proxy Configuration (if applicable)
