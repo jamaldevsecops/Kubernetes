@@ -195,7 +195,7 @@ sudo nano /etc/hosts
 ```
 192.168.20.163 boutique.apsis.localnet
 ```
-![Web UI](<img width="1661" height="682" alt="image" src="https://github.com/user-attachments/assets/1e283c1e-0601-4c72-bb24-dbbb71f2f09d" />)
+![Web UI](https://github.com/GoogleCloudPlatform/microservices-demo/blob/main/docs/img/online-boutique-frontend-1.png)
 
 ---
 
