@@ -195,8 +195,6 @@ sudo nano /etc/hosts
 ```
 192.168.20.163 boutique.apsis.localnet
 ```
-![Web UI](https://github.com/GoogleCloudPlatform/microservices-demo/blob/main/docs/img/online-boutique-frontend-1.png)
-
 ---
 
 ## ✅ Access
@@ -204,7 +202,7 @@ sudo nano /etc/hosts
 ```
 http://boutique.apsis.localnet
 ```
-
+![Web UI](https://github.com/GoogleCloudPlatform/microservices-demo/blob/main/docs/img/online-boutique-frontend-1.png)
 ---
 
 ## 🔐 (Optional) Enable HTTPS
