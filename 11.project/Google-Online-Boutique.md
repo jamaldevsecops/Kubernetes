@@ -25,7 +25,7 @@ The application is a **microservices-based e-commerce demo** consisting of:
 - GitHub Repo: https://github.com/GoogleCloudPlatform/microservices-demo  
 
 ## 🧱 Architecture Overview
-![Online Boutique Architecture](https://github.com/GoogleCloudPlatform/microservices-demo/blob/main/docs/img/architecture-diagram.png)
+![Web UI](https://github.com/GoogleCloudPlatform/microservices-demo/blob/main/docs/img/architecture-diagram.png)
 
 ---
 
